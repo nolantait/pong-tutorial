@@ -6,10 +6,30 @@ use bevy::sprite::{
 
 const BALL_SPEED: f32 = 5.;
 const BALL_SIZE: f32 = 5.;
-const PADDLE_SPEED: f32 = 1.;
+const PADDLE_SPEED: f32 = 4.;
 const PADDLE_WIDTH: f32 = 10.;
 const PADDLE_HEIGHT: f32 = 50.;
 const GUTTER_HEIGHT: f32 = 96.;
+
+#[derive(Component)]
+struct PlayerScore;
+
+#[derive(Component)]
+struct AiScore;
+
+#[derive(Resource, Default)]
+struct Score {
+    player: u32,
+    ai: u32,
+}
+
+enum Scorer {
+    Ai,
+    Player,
+}
+
+#[derive(Event)]
+struct Scored(Scorer);
 
 #[derive(Component)]
 struct Ball;
@@ -87,6 +107,9 @@ struct Shape(Vec2);
 #[derive(Component)]
 struct Player;
 
+#[derive(Component)]
+struct Ai;
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
@@ -102,6 +125,7 @@ fn main() {
                 move_ball,
                 handle_player_input,
                 detect_scoring,
+                move_ai,
                 reset_ball.after(detect_scoring),
                 update_score.after(detect_scoring),
                 update_scoreboard.after(update_score),
@@ -111,6 +135,18 @@ fn main() {
             ),
         )
         .run();
+}
+
+fn move_ai(
+    mut ai: Query<(&mut Velocity, &Position), With<Ai>>,
+    ball: Query<&Position, With<Ball>>,
+) {
+    if let Ok((mut velocity, position)) = ai.get_single_mut() {
+        if let Ok(ball_position) = ball.get_single() {
+            let a_to_b = ball_position.0 - position.0;
+            velocity.0.y = a_to_b.y.signum();
+        }
+    }
 }
 
 fn update_scoreboard(
@@ -178,18 +214,6 @@ fn spawn_scoreboard(
 
 }
 
-#[derive(Component)]
-struct PlayerScore;
-
-#[derive(Component)]
-struct AiScore;
-
-#[derive(Resource, Default)]
-struct Score {
-    player: u32,
-    ai: u32,
-}
-
 fn update_score(mut score: ResMut<Score>, mut events: EventReader<Scored>) {
     for event in events.iter() {
         match event.0 {
@@ -200,14 +224,6 @@ fn update_score(mut score: ResMut<Score>, mut events: EventReader<Scored>) {
 
     println!("Score: {} - {}", score.player, score.ai);
 }
-
-enum Scorer {
-    Ai,
-    Player,
-}
-
-#[derive(Event)]
-struct Scored(Scorer);
 
 fn detect_scoring(
     mut ball: Query<&mut Position, With<Ball>>,
@@ -253,9 +269,9 @@ fn handle_player_input(
 ) {
     if let Ok(mut velocity) = paddle.get_single_mut() {
         if keyboard_input.pressed(KeyCode::Up) {
-            velocity.0.y = 5.;
+            velocity.0.y = 1.;
         } else if keyboard_input.pressed(KeyCode::Down) {
-            velocity.0.y = -5.;
+            velocity.0.y = -1.;
         } else {
             velocity.0.y = 0.;
         }
@@ -371,28 +387,32 @@ fn spawn_paddles(
 
     if let Ok(window) = window.get_single() {
         let window_width = window.resolution.width();
-        let right_paddle_x = window_width / 2. - 50.;
-        let left_paddle_x = -window_width / 2. + 50.;
+        let padding = 50.;
+        let right_paddle_x = window_width / 2. - padding;
+        let left_paddle_x = -window_width / 2. + padding;
 
-        let mesh = meshes.add(Mesh::from(shape::Quad::new(Vec2::new(
+        let mesh = Mesh::from(shape::Quad::new(Vec2::new(
             PADDLE_WIDTH,
             PADDLE_HEIGHT,
-        ))));
+        )));
+
+        let mesh_handle = meshes.add(mesh);
 
         commands.spawn((
             Player,
             PaddleBundle::new(right_paddle_x, 0.),
             MaterialMesh2dBundle {
-                mesh: mesh.clone().into(),
+                mesh: mesh_handle.clone().into(),
                 material: materials.add(ColorMaterial::from(Color::rgb(0., 1., 0.))),
                 ..default()
             },
         ));
 
         commands.spawn((
+            Ai,
             PaddleBundle::new(left_paddle_x, 0.),
             MaterialMesh2dBundle {
-                mesh: mesh.into(),
+                mesh: mesh_handle.into(),
                 material: materials.add(ColorMaterial::from(Color::rgb(0., 0., 1.))),
                 ..default()
             },
@@ -406,14 +426,17 @@ fn spawn_ball(
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     println!("Spawning ball...");
-    let mesh = meshes.add(Mesh::from(shape::Circle::new(5.)));
-    let material = materials.add(Color::rgb(1., 0., 0.).into());
+    let mesh = Mesh::from(shape::Circle::new(5.));
+    let material = ColorMaterial::from(Color::rgb(1., 0., 0.));
+
+    let mesh_handle = meshes.add(mesh);
+    let material_handle = materials.add(material);
 
     commands.spawn((
         BallBundle::new(1., 1.),
         MaterialMesh2dBundle {
-            mesh: mesh.into(),
-            material: material.into(),
+            mesh: mesh_handle.into(),
+            material: material_handle,
             ..default()
         },
     ));

@@ -9,7 +9,7 @@ const BALL_SIZE: f32 = 5.;
 const PADDLE_SPEED: f32 = 1.;
 const PADDLE_WIDTH: f32 = 10.;
 const PADDLE_HEIGHT: f32 = 50.;
-const GUTTER_HEIGHT: f32 = 20.;
+const GUTTER_HEIGHT: f32 = 96.;
 
 #[derive(Component)]
 struct Ball;
@@ -94,7 +94,7 @@ fn main() {
         .add_event::<Scored>()
         .add_systems(
             Startup,
-            (spawn_ball, spawn_camera, spawn_paddles, spawn_gutters),
+            (spawn_ball, spawn_camera, spawn_paddles, spawn_gutters, spawn_scoreboard),
         )
         .add_systems(
             Update,
@@ -104,6 +104,7 @@ fn main() {
                 detect_scoring,
                 reset_ball.after(detect_scoring),
                 update_score.after(detect_scoring),
+                update_scoreboard.after(update_score),
                 move_paddles.after(handle_player_input),
                 project_positions.after(move_ball),
                 handle_collisions.after(move_ball),
@@ -111,6 +112,77 @@ fn main() {
         )
         .run();
 }
+
+fn update_scoreboard(
+    mut player_score: Query<&mut Text, With<PlayerScore>>,
+    mut ai_score: Query<&mut Text, (With<AiScore>, Without<PlayerScore>)>,
+    score: Res<Score>,
+) {
+    if score.is_changed() {
+        if let Ok(mut player_score) = player_score.get_single_mut() {
+            player_score.sections[0].value = score.player.to_string();
+        }
+
+        if let Ok(mut ai_score) = ai_score.get_single_mut() {
+            ai_score.sections[0].value = score.ai.to_string();
+        }
+    }
+}
+
+fn spawn_scoreboard(
+    mut commands: Commands,
+) {
+    commands.spawn((
+        // Create a TextBundle that has a Text with a single section.
+        TextBundle::from_section(
+            // Accepts a `String` or any type that converts into a `String`, such as `&str`
+            "0",
+            TextStyle {
+                font_size: 72.0,
+                color: Color::WHITE,
+                ..default()
+            },
+        ) // Set the alignment of the Text
+        .with_text_alignment(TextAlignment::Center)
+        // Set the style of the TextBundle itself.
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(5.0),
+            right: Val::Px(15.0),
+            ..default()
+        }),
+        PlayerScore
+    ));
+
+    commands.spawn((
+        // Create a TextBundle that has a Text with a single section.
+        TextBundle::from_section(
+            // Accepts a `String` or any type that converts into a `String`, such as `&str`
+            "0",
+            TextStyle {
+                font_size: 72.0,
+                color: Color::WHITE,
+                ..default()
+            },
+        ) // Set the alignment of the Text
+        .with_text_alignment(TextAlignment::Center)
+        // Set the style of the TextBundle itself.
+        .with_style(Style {
+            position_type: PositionType::Absolute,
+            top: Val::Px(5.0),
+            left: Val::Px(15.0),
+            ..default()
+        }),
+        AiScore
+    ));
+
+}
+
+#[derive(Component)]
+struct PlayerScore;
+
+#[derive(Component)]
+struct AiScore;
 
 #[derive(Resource, Default)]
 struct Score {

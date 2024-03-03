@@ -1,7 +1,7 @@
-use bevy::prelude::*;
-use bevy::sprite::{
-    collide_aabb::{collide, Collision},
-    MaterialMesh2dBundle,
+use bevy::{
+    math::bounding::{Aabb2d, BoundingCircle, BoundingVolume, IntersectsVolume},
+    prelude::*,
+    sprite::MaterialMesh2dBundle,
 };
 
 const BALL_SPEED: f32 = 5.;
@@ -110,6 +110,14 @@ struct Player;
 #[derive(Component)]
 struct Ai;
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum Collision {
+    Left,
+    Right,
+    Top,
+    Bottom,
+}
+
 fn main() {
     App::new()
         .add_plugins(DefaultPlugins)
@@ -179,7 +187,7 @@ fn spawn_scoreboard(
                 ..default()
             },
         ) // Set the alignment of the Text
-        .with_text_alignment(TextAlignment::Center)
+        .with_text_justify(JustifyText::Center)
         // Set the style of the TextBundle itself.
         .with_style(Style {
             position_type: PositionType::Absolute,
@@ -201,7 +209,7 @@ fn spawn_scoreboard(
                 ..default()
             },
         ) // Set the alignment of the Text
-        .with_text_alignment(TextAlignment::Center)
+        .with_text_justify(JustifyText::Center)
         // Set the style of the TextBundle itself.
         .with_style(Style {
             position_type: PositionType::Absolute,
@@ -215,7 +223,7 @@ fn spawn_scoreboard(
 }
 
 fn update_score(mut score: ResMut<Score>, mut events: EventReader<Scored>) {
-    for event in events.iter() {
+    for event in events.read() {
         match event.0 {
             Scorer::Ai => score.ai += 1,
             Scorer::Player => score.player += 1,
@@ -247,7 +255,7 @@ fn reset_ball(
     mut ball: Query<(&mut Position, &mut Velocity), With<Ball>>,
     mut events: EventReader<Scored>,
 ) {
-    for event in events.iter() {
+    for event in events.read() {
         if let Ok((mut position, mut velocity)) = ball.get_single_mut() {
             match event.0 {
                 Scorer::Ai => {
@@ -264,13 +272,13 @@ fn reset_ball(
 }
 
 fn handle_player_input(
-    keyboard_input: Res<Input<KeyCode>>,
+    keyboard_input: Res<ButtonInput<KeyCode>>,
     mut paddle: Query<&mut Velocity, With<Player>>,
 ) {
     if let Ok(mut velocity) = paddle.get_single_mut() {
-        if keyboard_input.pressed(KeyCode::Up) {
+        if keyboard_input.pressed(KeyCode::ArrowUp) {
             velocity.0.y = 1.;
-        } else if keyboard_input.pressed(KeyCode::Down) {
+        } else if keyboard_input.pressed(KeyCode::ArrowDown) {
             velocity.0.y = -1.;
         } else {
             velocity.0.y = 0.;
@@ -287,19 +295,28 @@ fn spawn_gutters(
     if let Ok(window) = window.get_single() {
         let window_width = window.resolution.width();
         let window_height = window.resolution.height();
+
+        // We take half the window height because the center of our screen
+        // is (0, 0). The padding would be half the height of the gutter as its
+        // origin is also center rather than top left
         let top_gutter_y = window_height / 2. - GUTTER_HEIGHT / 2.;
         let bottom_gutter_y = -window_height / 2. + GUTTER_HEIGHT / 2.;
 
         let top_gutter = GutterBundle::new(0., top_gutter_y, window_width);
         let bottom_gutter = GutterBundle::new(0., bottom_gutter_y, window_width);
-        let mesh = meshes.add(Mesh::from(shape::Quad::new(top_gutter.shape.0)));
-        let material = materials.add(ColorMaterial::from(Color::rgb(0., 0., 0.)));
+
+        let mesh = Mesh::from(Rectangle::from_size(top_gutter.shape.0));
+        let material = ColorMaterial::from(Color::rgb(0., 0., 0.));
+
+        // We can share these meshes between our gutters by cloning them
+        let mesh_handle = meshes.add(mesh);
+        let material_handle = materials.add(material);
 
         commands.spawn((
             top_gutter,
             MaterialMesh2dBundle {
-                mesh: mesh.clone().into(),
-                material: material.clone(),
+                mesh: mesh_handle.clone().into(),
+                material: material_handle.clone(),
                 ..default()
             },
         ));
@@ -307,8 +324,8 @@ fn spawn_gutters(
         commands.spawn((
             bottom_gutter,
             MaterialMesh2dBundle {
-                mesh: mesh.clone().into(),
-                material: material.clone(),
+                mesh: mesh_handle.into(),
+                material: material_handle.clone(),
                 ..default()
             },
         ));
@@ -343,17 +360,43 @@ fn move_paddles(
     }
 }
 
+
+// Returns `Some` if `ball` collides with `wall`. The returned `Collision` is the
+// side of `wall` that `ball` hit.
+fn collide_with_side(ball: BoundingCircle, wall: Aabb2d) -> Option<Collision> {
+    if !ball.intersects(&wall) {
+        return None;
+    }
+
+    let closest = wall.closest_point(ball.center());
+    let offset = ball.center() - closest;
+    let side = if offset.x.abs() > offset.y.abs() {
+        if offset.x < 0. {
+            Collision::Left
+        } else {
+            Collision::Right
+        }
+    } else if offset.y > 0. {
+        Collision::Top
+    } else {
+        Collision::Bottom
+    };
+
+    Some(side)
+}
+
 fn handle_collisions(
     mut ball: Query<(&mut Velocity, &Position, &Shape), With<Ball>>,
     other_things: Query<(&Position, &Shape), Without<Ball>>,
 ) {
     if let Ok((mut ball_velocity, ball_position, ball_shape)) = ball.get_single_mut() {
         for (position, shape) in &other_things {
-            if let Some(collision) = collide(
-                ball_position.0.extend(0.),
-                ball_shape.0,
-                position.0.extend(0.),
-                shape.0,
+            if let Some(collision) = collide_with_side(
+                BoundingCircle::new(ball_position.0, ball_shape.0.x),
+                Aabb2d::new(
+                    position.0,
+                    shape.0 / 2.
+                )
             ) {
                 match collision {
                     Collision::Left => {
@@ -367,9 +410,6 @@ fn handle_collisions(
                     }
                     Collision::Bottom => {
                         ball_velocity.0.y *= -1.;
-                    }
-                    Collision::Inside => {
-                        // Do nothing
                     }
                 }
             }
@@ -391,10 +431,10 @@ fn spawn_paddles(
         let right_paddle_x = window_width / 2. - padding;
         let left_paddle_x = -window_width / 2. + padding;
 
-        let mesh = Mesh::from(shape::Quad::new(Vec2::new(
+        let mesh = Mesh::from(Rectangle::new(
             PADDLE_WIDTH,
             PADDLE_HEIGHT,
-        )));
+        ));
 
         let mesh_handle = meshes.add(mesh);
 
@@ -426,12 +466,19 @@ fn spawn_ball(
     mut materials: ResMut<Assets<ColorMaterial>>,
 ) {
     println!("Spawning ball...");
-    let mesh = Mesh::from(shape::Circle::new(5.));
-    let material = ColorMaterial::from(Color::rgb(1., 0., 0.));
 
-    let mesh_handle = meshes.add(mesh);
-    let material_handle = materials.add(material);
+    let shape = Mesh::from(Circle::new(BALL_SIZE));
+    let color = ColorMaterial::from(Color::rgb(1., 0., 0.));
 
+    // `Assets::add` will load these into memory and return a `Handle` (an ID)
+    // to these assets. When all references to this `Handle` are cleaned up
+    // the asset is cleaned up.
+    let mesh_handle = meshes.add(shape);
+    let material_handle = materials.add(color);
+
+    // Here we are using `spawn` instead of `spawn_empty` followed by an
+    // `insert`. They mean the same thing, letting us spawn many components on a
+    // new entity at once.
     commands.spawn((
         BallBundle::new(1., 1.),
         MaterialMesh2dBundle {

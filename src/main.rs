@@ -308,12 +308,12 @@ fn spawn_gutters(
     let top_gutter = GutterBundle::new(0., top_gutter_y, window_width);
     let bottom_gutter = GutterBundle::new(0., bottom_gutter_y, window_width);
 
-    let mesh = Mesh::from(Rectangle::from_size(top_gutter.shape.0));
-    let material = ColorMaterial::from(Color::rgb(0., 0., 0.));
+    let shape = Rectangle::from_size(top_gutter.shape.0);
+    let color = Color::srgb(0., 0., 0.);
 
     // We can share these meshes between our gutters by cloning them
-    let mesh_handle = meshes.add(mesh);
-    let material_handle = materials.add(material);
+    let mesh_handle = meshes.add(shape);
+    let material_handle = materials.add(color);
 
     commands.spawn((
       top_gutter,
@@ -335,8 +335,8 @@ fn spawn_gutters(
   }
 }
 
-fn project_positions(mut ball: Query<(&mut Transform, &Position)>) {
-  for (mut transform, position) in &mut ball {
+fn project_positions(mut positionables: Query<(&mut Transform, &Position)>) {
+  for (mut transform, position) in &mut positionables {
     transform.translation = position.0.extend(0.);
   }
 }
@@ -434,16 +434,16 @@ fn spawn_paddles(
     let right_paddle_x = window_width / 2. - padding;
     let left_paddle_x = -window_width / 2. + padding;
 
-    let mesh = Mesh::from(Rectangle::new(PADDLE_WIDTH, PADDLE_HEIGHT));
+    let shape = Rectangle::new(PADDLE_WIDTH, PADDLE_HEIGHT);
 
-    let mesh_handle = meshes.add(mesh);
+    let mesh = meshes.add(shape);
 
     commands.spawn((
       Player,
       PaddleBundle::new(right_paddle_x, 0.),
       MaterialMesh2dBundle {
-        mesh: mesh_handle.clone().into(),
-        material: materials.add(ColorMaterial::from(Color::rgb(0., 1., 0.))),
+        mesh: mesh.clone().into(),
+        material: materials.add(Color::srgb(0., 1., 0.)),
         ..default()
       },
     ));
@@ -452,8 +452,8 @@ fn spawn_paddles(
       Ai,
       PaddleBundle::new(left_paddle_x, 0.),
       MaterialMesh2dBundle {
-        mesh: mesh_handle.into(),
-        material: materials.add(ColorMaterial::from(Color::rgb(0., 0., 1.))),
+        mesh: mesh.into(),
+        material: materials.add(Color::srgb(0., 0., 1.)),
         ..default()
       },
     ));
@@ -467,14 +467,14 @@ fn spawn_ball(
 ) {
   println!("Spawning ball...");
 
-  let shape = Mesh::from(Circle::new(BALL_SIZE));
-  let color = ColorMaterial::from(Color::rgb(1., 0., 0.));
+  let shape = Circle::new(BALL_SIZE);
+  let color = Color::srgb(1., 0., 0.);
 
   // `Assets::add` will load these into memory and return a `Handle` (an ID)
   // to these assets. When all references to this `Handle` are cleaned up
   // the asset is cleaned up.
-  let mesh_handle = meshes.add(shape);
-  let material_handle = materials.add(color);
+  let mesh = meshes.add(shape);
+  let material = materials.add(color);
 
   // Here we are using `spawn` instead of `spawn_empty` followed by an
   // `insert`. They mean the same thing, letting us spawn many components on a
@@ -482,8 +482,8 @@ fn spawn_ball(
   commands.spawn((
     BallBundle::new(1., 1.),
     MaterialMesh2dBundle {
-      mesh: mesh_handle.into(),
-      material: material_handle,
+      mesh: mesh.into(),
+      material,
       ..default()
     },
   ));

@@ -437,13 +437,15 @@ fn spawn_paddles(
     let shape = Rectangle::new(PADDLE_WIDTH, PADDLE_HEIGHT);
 
     let mesh = meshes.add(shape);
+    let player_color = materials.add(Color::srgb(0., 1., 0.));
+    let ai_color = materials.add(Color::srgb(0., 0., 1.));
 
     commands.spawn((
       Player,
       PaddleBundle::new(right_paddle_x, 0.),
       MaterialMesh2dBundle {
         mesh: mesh.clone().into(),
-        material: materials.add(Color::srgb(0., 1., 0.)),
+        material: player_color,
         ..default()
       },
     ));
@@ -453,7 +455,7 @@ fn spawn_paddles(
       PaddleBundle::new(left_paddle_x, 0.),
       MaterialMesh2dBundle {
         mesh: mesh.into(),
-        material: materials.add(Color::srgb(0., 0., 1.)),
+        material: ai_color,
         ..default()
       },
     ));

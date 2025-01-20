@@ -1,10 +1,9 @@
 use bevy::{
   math::bounding::{Aabb2d, BoundingCircle, BoundingVolume, IntersectsVolume},
   prelude::*,
-  sprite::MaterialMesh2dBundle,
 };
 
-const BALL_SPEED: f32 = 5.;
+const BALL_SPEED: f32 = 1.;
 const BALL_SIZE: f32 = 5.;
 const PADDLE_SPEED: f32 = 4.;
 const PADDLE_WIDTH: f32 = 10.;
@@ -32,76 +31,32 @@ enum Scorer {
 struct Scored(Scorer);
 
 #[derive(Component)]
+#[require(
+    Position,
+    Velocity(|| Velocity(Vec2::new(-1., 1.))),
+    Shape(|| Shape(Vec2::new(BALL_SIZE, BALL_SIZE))),
+)]
 struct Ball;
 
-#[derive(Bundle)]
-struct BallBundle {
-  ball: Ball,
-  shape: Shape,
-  velocity: Velocity,
-  position: Position,
-}
-
-impl BallBundle {
-  fn new(x: f32, y: f32) -> Self {
-    Self {
-      ball: Ball,
-      shape: Shape(Vec2::splat(BALL_SIZE)),
-      velocity: Velocity(Vec2::new(x, y)),
-      position: Position(Vec2::new(0., 0.)),
-    }
-  }
-}
-
 #[derive(Component)]
+#[require(
+    Position,
+    Shape(|| Shape(Vec2::new(PADDLE_WIDTH, PADDLE_HEIGHT))),
+    Velocity
+)]
 struct Paddle;
 
-#[derive(Bundle)]
-struct PaddleBundle {
-  paddle: Paddle,
-  shape: Shape,
-  position: Position,
-  velocity: Velocity,
-}
-
-impl PaddleBundle {
-  fn new(x: f32, y: f32) -> Self {
-    Self {
-      paddle: Paddle,
-      shape: Shape(Vec2::new(PADDLE_WIDTH, PADDLE_HEIGHT)),
-      position: Position(Vec2::new(x, y)),
-      velocity: Velocity(Vec2::new(0., 0.)),
-    }
-  }
-}
-
 #[derive(Component)]
+#[require(Position, Shape)]
 struct Gutter;
 
-#[derive(Bundle)]
-struct GutterBundle {
-  gutter: Gutter,
-  shape: Shape,
-  position: Position,
-}
-
-impl GutterBundle {
-  fn new(x: f32, y: f32, w: f32) -> Self {
-    Self {
-      gutter: Gutter,
-      shape: Shape(Vec2::new(w, GUTTER_HEIGHT)),
-      position: Position(Vec2::new(x, y)),
-    }
-  }
-}
-
-#[derive(Component)]
+#[derive(Component, Default)]
 struct Position(Vec2);
 
-#[derive(Component)]
+#[derive(Component, Default)]
 struct Velocity(Vec2);
 
-#[derive(Component)]
+#[derive(Component, Default)]
 struct Shape(Vec2);
 
 #[derive(Component)]
@@ -170,58 +125,48 @@ fn update_scoreboard(
 ) {
   if score.is_changed() {
     if let Ok(mut player_score) = player_score.get_single_mut() {
-      player_score.sections[0].value = score.player.to_string();
+      player_score.0 = score.player.to_string();
     }
 
     if let Ok(mut ai_score) = ai_score.get_single_mut() {
-      ai_score.sections[0].value = score.ai.to_string();
+      ai_score.0 = score.player.to_string();
     }
   }
 }
 
 fn spawn_scoreboard(mut commands: Commands) {
   commands.spawn((
-    // Create a TextBundle that has a Text with a single section.
-    TextBundle::from_section(
-      // Accepts a `String` or any type that converts into a `String`, such as `&str`
-      "0",
-      TextStyle {
-        font_size: 72.0,
-        color: Color::WHITE,
-        ..default()
-      },
-    ) // Set the alignment of the Text
-    .with_text_justify(JustifyText::Center)
-    // Set the style of the TextBundle itself.
-    .with_style(Style {
+    PlayerScore,
+    Text::new("0"),
+    TextFont {
+      font_size: 72.0,
+      ..default()
+    },
+    TextColor(Color::WHITE),
+    TextLayout::new_with_justify(JustifyText::Center),
+    Node {
       position_type: PositionType::Absolute,
       top: Val::Px(5.0),
       right: Val::Px(15.0),
       ..default()
-    }),
-    PlayerScore,
+    },
   ));
 
   commands.spawn((
-    // Create a TextBundle that has a Text with a single section.
-    TextBundle::from_section(
-      // Accepts a `String` or any type that converts into a `String`, such as `&str`
-      "0",
-      TextStyle {
-        font_size: 72.0,
-        color: Color::WHITE,
-        ..default()
-      },
-    ) // Set the alignment of the Text
-    .with_text_justify(JustifyText::Center)
-    // Set the style of the TextBundle itself.
-    .with_style(Style {
+    AiScore,
+    Text::new("0"),
+    TextFont {
+      font_size: 72.0,
+      ..default()
+    },
+    TextColor(Color::WHITE),
+    TextLayout::new_with_justify(JustifyText::Center),
+    Node {
       position_type: PositionType::Absolute,
       top: Val::Px(5.0),
       left: Val::Px(15.0),
       ..default()
-    }),
-    AiScore,
+    },
   ));
 }
 
@@ -232,8 +177,6 @@ fn update_score(mut score: ResMut<Score>, mut events: EventReader<Scored>) {
       Scorer::Player => score.player += 1,
     }
   }
-
-  println!("Score: {} - {}", score.player, score.ai);
 }
 
 fn detect_scoring(
@@ -305,10 +248,7 @@ fn spawn_gutters(
     let top_gutter_y = window_height / 2. - GUTTER_HEIGHT / 2.;
     let bottom_gutter_y = -window_height / 2. + GUTTER_HEIGHT / 2.;
 
-    let top_gutter = GutterBundle::new(0., top_gutter_y, window_width);
-    let bottom_gutter = GutterBundle::new(0., bottom_gutter_y, window_width);
-
-    let shape = Rectangle::from_size(top_gutter.shape.0);
+    let shape = Rectangle::from_size(Vec2::new(window_width, GUTTER_HEIGHT));
     let color = Color::srgb(0., 0., 0.);
 
     // We can share these meshes between our gutters by cloning them
@@ -316,21 +256,19 @@ fn spawn_gutters(
     let material_handle = materials.add(color);
 
     commands.spawn((
-      top_gutter,
-      MaterialMesh2dBundle {
-        mesh: mesh_handle.clone().into(),
-        material: material_handle.clone(),
-        ..default()
-      },
+      Gutter,
+      Shape(shape.size()),
+      Position(Vec2::new(0., top_gutter_y)),
+      Mesh2d(mesh_handle.clone()),
+      MeshMaterial2d(material_handle.clone()),
     ));
 
     commands.spawn((
-      bottom_gutter,
-      MaterialMesh2dBundle {
-        mesh: mesh_handle.into(),
-        material: material_handle.clone(),
-        ..default()
-      },
+      Gutter,
+      Shape(shape.size()),
+      Position(Vec2::new(0., bottom_gutter_y)),
+      Mesh2d(mesh_handle.clone()),
+      MeshMaterial2d(material_handle.clone()),
     ));
   }
 }
@@ -372,8 +310,10 @@ fn collide_with_side(ball: BoundingCircle, wall: Aabb2d) -> Option<Collision> {
     return None;
   }
 
+  let center = ball.center();
   let closest = wall.closest_point(ball.center());
   let offset = ball.center() - closest;
+
   let side = if offset.x.abs() > offset.y.abs() {
     if offset.x < 0. {
       Collision::Left
@@ -397,9 +337,12 @@ fn handle_collisions(
     ball.get_single_mut()
   {
     for (position, shape) in &other_things {
+      let circle = Circle {
+        radius: ball_shape.0.x,
+      };
       if let Some(collision) = collide_with_side(
-        BoundingCircle::new(ball_position.0, ball_shape.0.x),
-        Aabb2d::new(position.0, shape.0 / 2.),
+        BoundingCircle::new(ball_position.0, circle.radius),
+        Aabb2d::new(position.0, shape.0 / 2.0),
       ) {
         match collision {
           Collision::Left => {
@@ -442,22 +385,19 @@ fn spawn_paddles(
 
     commands.spawn((
       Player,
-      PaddleBundle::new(right_paddle_x, 0.),
-      MaterialMesh2dBundle {
-        mesh: mesh.clone().into(),
-        material: player_color,
-        ..default()
-      },
+      Paddle,
+      Shape(shape.size()),
+      Position(Vec2::new(right_paddle_x, 0.)),
+      Mesh2d(mesh.clone()),
+      MeshMaterial2d(player_color.clone()),
     ));
 
     commands.spawn((
       Ai,
-      PaddleBundle::new(left_paddle_x, 0.),
-      MaterialMesh2dBundle {
-        mesh: mesh.into(),
-        material: ai_color,
-        ..default()
-      },
+      Paddle,
+      Position(Vec2::new(left_paddle_x, 0.)),
+      Mesh2d(mesh.clone()),
+      MeshMaterial2d(ai_color.clone()),
     ));
   }
 }
@@ -481,16 +421,9 @@ fn spawn_ball(
   // Here we are using `spawn` instead of `spawn_empty` followed by an
   // `insert`. They mean the same thing, letting us spawn many components on a
   // new entity at once.
-  commands.spawn((
-    BallBundle::new(1., 1.),
-    MaterialMesh2dBundle {
-      mesh: mesh.into(),
-      material,
-      ..default()
-    },
-  ));
+  commands.spawn((Ball, Mesh2d(mesh), MeshMaterial2d(material)));
 }
 
 fn spawn_camera(mut commands: Commands) {
-  commands.spawn_empty().insert(Camera2dBundle::default());
+  commands.spawn_empty().insert(Camera2d);
 }

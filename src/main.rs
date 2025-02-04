@@ -129,7 +129,7 @@ fn update_scoreboard(
     }
 
     if let Ok(mut ai_score) = ai_score.get_single_mut() {
-      ai_score.0 = score.player.to_string();
+      ai_score.0 = score.ai.to_string();
     }
   }
 }

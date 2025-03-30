@@ -425,5 +425,5 @@ fn spawn_ball(
 }
 
 fn spawn_camera(mut commands: Commands) {
-  commands.spawn_empty().insert(Camera2d);
+  commands.spawn(Camera2d);
 }

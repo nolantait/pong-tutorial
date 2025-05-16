@@ -33,15 +33,15 @@ struct Scored(Scorer);
 #[derive(Component)]
 #[require(
     Position,
-    Velocity(|| Velocity(Vec2::new(-1., 1.))),
-    Shape(|| Shape(Vec2::new(BALL_SIZE, BALL_SIZE))),
+    Velocity = Velocity(Vec2::new(-1., 1.)),
+    Shape = Shape(Vec2::new(BALL_SIZE, BALL_SIZE)),
 )]
 struct Ball;
 
 #[derive(Component)]
 #[require(
     Position,
-    Shape(|| Shape(Vec2::new(PADDLE_WIDTH, PADDLE_HEIGHT))),
+    Shape = Shape(Vec2::new(PADDLE_WIDTH, PADDLE_HEIGHT)),
     Velocity
 )]
 struct Paddle;
@@ -110,8 +110,8 @@ fn move_ai(
   mut ai: Query<(&mut Velocity, &Position), With<Ai>>,
   ball: Query<&Position, With<Ball>>,
 ) {
-  if let Ok((mut velocity, position)) = ai.get_single_mut() {
-    if let Ok(ball_position) = ball.get_single() {
+  if let Ok((mut velocity, position)) = ai.single_mut() {
+    if let Ok(ball_position) = ball.single() {
       let a_to_b = ball_position.0 - position.0;
       velocity.0.y = a_to_b.y.signum();
     }
@@ -124,11 +124,11 @@ fn update_scoreboard(
   score: Res<Score>,
 ) {
   if score.is_changed() {
-    if let Ok(mut player_score) = player_score.get_single_mut() {
+    if let Ok(mut player_score) = player_score.single_mut() {
       player_score.0 = score.player.to_string();
     }
 
-    if let Ok(mut ai_score) = ai_score.get_single_mut() {
+    if let Ok(mut ai_score) = ai_score.single_mut() {
       ai_score.0 = score.ai.to_string();
     }
   }
@@ -184,14 +184,14 @@ fn detect_scoring(
   window: Query<&Window>,
   mut events: EventWriter<Scored>,
 ) {
-  if let Ok(window) = window.get_single() {
+  if let Ok(window) = window.single() {
     let window_width = window.resolution.width();
 
-    if let Ok(ball) = ball.get_single_mut() {
+    if let Ok(ball) = ball.single_mut() {
       if ball.0.x > window_width / 2. {
-        events.send(Scored(Scorer::Ai));
+        events.write(Scored(Scorer::Ai));
       } else if ball.0.x < -window_width / 2. {
-        events.send(Scored(Scorer::Player));
+        events.write(Scored(Scorer::Player));
       }
     }
   }
@@ -202,7 +202,7 @@ fn reset_ball(
   mut events: EventReader<Scored>,
 ) {
   for event in events.read() {
-    if let Ok((mut position, mut velocity)) = ball.get_single_mut() {
+    if let Ok((mut position, mut velocity)) = ball.single_mut() {
       match event.0 {
         Scorer::Ai => {
           position.0 = Vec2::new(0., 0.);
@@ -221,7 +221,7 @@ fn handle_player_input(
   keyboard_input: Res<ButtonInput<KeyCode>>,
   mut paddle: Query<&mut Velocity, With<Player>>,
 ) {
-  if let Ok(mut velocity) = paddle.get_single_mut() {
+  if let Ok(mut velocity) = paddle.single_mut() {
     if keyboard_input.pressed(KeyCode::ArrowUp) {
       velocity.0.y = 1.;
     } else if keyboard_input.pressed(KeyCode::ArrowDown) {
@@ -238,7 +238,7 @@ fn spawn_gutters(
   mut materials: ResMut<Assets<ColorMaterial>>,
   window: Query<&Window>,
 ) {
-  if let Ok(window) = window.get_single() {
+  if let Ok(window) = window.single() {
     let window_width = window.resolution.width();
     let window_height = window.resolution.height();
 
@@ -280,7 +280,7 @@ fn project_positions(mut positionables: Query<(&mut Transform, &Position)>) {
 }
 
 fn move_ball(mut ball: Query<(&mut Position, &Velocity), With<Ball>>) {
-  if let Ok((mut position, velocity)) = ball.get_single_mut() {
+  if let Ok((mut position, velocity)) = ball.single_mut() {
     position.0 += velocity.0 * BALL_SPEED;
   }
 }
@@ -289,7 +289,7 @@ fn move_paddles(
   mut paddle: Query<(&mut Position, &Velocity), With<Paddle>>,
   window: Query<&Window>,
 ) {
-  if let Ok(window) = window.get_single() {
+  if let Ok(window) = window.single() {
     let window_height = window.resolution.height();
 
     for (mut position, velocity) in &mut paddle {
@@ -310,7 +310,6 @@ fn collide_with_side(ball: BoundingCircle, wall: Aabb2d) -> Option<Collision> {
     return None;
   }
 
-  let center = ball.center();
   let closest = wall.closest_point(ball.center());
   let offset = ball.center() - closest;
 
@@ -333,8 +332,7 @@ fn handle_collisions(
   mut ball: Query<(&mut Velocity, &Position, &Shape), With<Ball>>,
   other_things: Query<(&Position, &Shape), Without<Ball>>,
 ) {
-  if let Ok((mut ball_velocity, ball_position, ball_shape)) =
-    ball.get_single_mut()
+  if let Ok((mut ball_velocity, ball_position, ball_shape)) = ball.single_mut()
   {
     for (position, shape) in &other_things {
       let circle = Circle {
@@ -371,7 +369,7 @@ fn spawn_paddles(
 ) {
   println!("Spawning paddles...");
 
-  if let Ok(window) = window.get_single() {
+  if let Ok(window) = window.single() {
     let window_width = window.resolution.width();
     let padding = 50.;
     let right_paddle_x = window_width / 2. - padding;

@@ -1,9 +1,9 @@
 [package]
 name = "pong"
 version = "0.1.0"
-edition = "2021"
+edition = "2024"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bevy = "0.15"
+bevy = { version = "0.16", default-features = false, features = [ "bevy_core_pipeline", "bevy_render", "bevy_text", "bevy_ui", "bevy_winit", "default_font", "multi_threaded", "x11", "wayland", "webgl2" ] }

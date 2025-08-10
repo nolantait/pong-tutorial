@@ -50,7 +50,7 @@ struct Paddle;
 #[require(Position, Shape)]
 struct Gutter;
 
-#[derive(Component, Default)]
+#[derive(Component, Default, Copy, Clone)]
 struct Position(Vec2);
 
 #[derive(Component, Default)]
@@ -107,15 +107,12 @@ fn main() {
 }
 
 fn move_ai(
-  mut ai: Query<(&mut Velocity, &Position), With<Ai>>,
-  ball: Query<&Position, With<Ball>>,
+  ai: Single<(&mut Velocity, &Position), With<Ai>>,
+  ball: Single<&Position, With<Ball>>,
 ) {
-  if let Ok((mut velocity, position)) = ai.single_mut() {
-    if let Ok(ball_position) = ball.single() {
-      let a_to_b = ball_position.0 - position.0;
-      velocity.0.y = a_to_b.y.signum();
-    }
-  }
+  let (mut velocity, position) = ai.into_inner();
+  let a_to_b = ball.0 - position.0;
+  velocity.0.y = a_to_b.y.signum();
 }
 
 fn update_scoreboard(
@@ -279,10 +276,13 @@ fn project_positions(mut positionables: Query<(&mut Transform, &Position)>) {
   }
 }
 
-fn move_ball(mut ball: Query<(&mut Position, &Velocity), With<Ball>>) {
-  if let Ok((mut position, velocity)) = ball.single_mut() {
-    position.0 += velocity.0 * BALL_SPEED;
-  }
+// fn move_ball(mut position: Single<&mut Position, With<Ball>>) {
+//   position.0.x += 1.0;
+// }
+
+fn move_ball(ball: Single<(&mut Position, &Velocity), With<Ball>>) {
+  let (mut position, velocity) = ball.into_inner();
+  position.0 += velocity.0 * BALL_SPEED;
 }
 
 fn move_paddles(

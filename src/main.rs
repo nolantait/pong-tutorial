@@ -33,6 +33,10 @@ struct Ball;
 )]
 struct Paddle;
 
+#[derive(Component)]
+#[require(Position, Collider)]
+struct Gutter;
+
 #[derive(Debug, PartialEq, Eq, Copy, Clone)]
 enum Collision {
   Left,
@@ -115,6 +119,44 @@ fn spawn_paddles(
   ));
 }
 
+const GUTTER_COLOR: Color = Color::srgb(0., 0., 1.);
+const GUTTER_HEIGHT: f32 = 20.;
+
+fn spawn_gutters(
+  mut commands: Commands,
+  mut meshes: ResMut<Assets<Mesh>>,
+  mut materials: ResMut<Assets<ColorMaterial>>,
+  window: Single<&Window>,
+) {
+  let material = materials.add(GUTTER_COLOR);
+  let padding = 20.;
+
+  let gutter_shape = Rectangle::new(window.resolution.width(), GUTTER_HEIGHT);
+  let mesh = meshes.add(gutter_shape);
+
+  let top_gutter_position =
+    Vec2::new(0., window.resolution.height() / 2. - padding);
+
+  commands.spawn((
+    Gutter,
+    Mesh2d(mesh.clone()),
+    MeshMaterial2d(material.clone()),
+    Position(top_gutter_position),
+    Collider(gutter_shape)
+  ));
+
+  let bottom_gutter_position =
+    Vec2::new(0., -window.resolution.height() / 2. + padding);
+
+  commands.spawn((
+    Gutter,
+    Mesh2d(mesh.clone()),
+    MeshMaterial2d(material.clone()),
+    Position(bottom_gutter_position),
+    Collider(gutter_shape)
+  ));
+}
+
 fn move_ball(ball: Single<(&mut Position, &Velocity), With<Ball>>) {
   let (mut position, velocity) = ball.into_inner();
   position.0 += velocity.0 * BALL_SPEED;
@@ -175,7 +217,7 @@ fn handle_collisions(
 fn main() {
   App::new()
     .add_plugins(DefaultPlugins)
-    .add_systems(Startup, (spawn_ball, spawn_paddles, spawn_camera))
+    .add_systems(Startup, (spawn_ball, spawn_paddles, spawn_camera, spawn_gutters))
     .add_systems(
       FixedUpdate,
       (
@@ -186,4 +228,3 @@ fn main() {
     )
     .run();
 }
-

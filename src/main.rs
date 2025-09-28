@@ -27,7 +27,7 @@ enum Scorer {
   Player,
 }
 
-#[derive(Event)]
+#[derive(Message)]
 struct Scored(Scorer);
 
 #[derive(Component)]
@@ -77,7 +77,7 @@ fn main() {
   App::new()
     .add_plugins(DefaultPlugins)
     .init_resource::<Score>()
-    .add_event::<Scored>()
+    .add_message::<Scored>()
     .add_systems(
       Startup,
       (
@@ -132,15 +132,13 @@ fn update_scoreboard(
 }
 
 fn spawn_scoreboard(mut commands: Commands) {
+  // The players score on the left hand side
   commands.spawn((
     PlayerScore,
     Text::new("0"),
-    TextFont {
-      font_size: 72.0,
-      ..default()
-    },
+    TextFont::from_font_size(72.0),
     TextColor(Color::WHITE),
-    TextLayout::new_with_justify(JustifyText::Center),
+    TextLayout::new_with_justify(Justify::Center),
     Node {
       position_type: PositionType::Absolute,
       top: Val::Px(5.0),
@@ -149,15 +147,13 @@ fn spawn_scoreboard(mut commands: Commands) {
     },
   ));
 
+  // The AI score on the right hand side
   commands.spawn((
     AiScore,
     Text::new("0"),
-    TextFont {
-      font_size: 72.0,
-      ..default()
-    },
+    TextFont::from_font_size(72.0),
     TextColor(Color::WHITE),
-    TextLayout::new_with_justify(JustifyText::Center),
+    TextLayout::new_with_justify(Justify::Center),
     Node {
       position_type: PositionType::Absolute,
       top: Val::Px(5.0),
@@ -167,7 +163,7 @@ fn spawn_scoreboard(mut commands: Commands) {
   ));
 }
 
-fn update_score(mut score: ResMut<Score>, mut events: EventReader<Scored>) {
+fn update_score(mut score: ResMut<Score>, mut events: MessageReader<Scored>) {
   for event in events.read() {
     match event.0 {
       Scorer::Ai => score.ai += 1,
@@ -179,7 +175,7 @@ fn update_score(mut score: ResMut<Score>, mut events: EventReader<Scored>) {
 fn detect_scoring(
   mut ball: Query<&mut Position, With<Ball>>,
   window: Query<&Window>,
-  mut events: EventWriter<Scored>,
+  mut events: MessageWriter<Scored>,
 ) {
   if let Ok(window) = window.single() {
     let window_width = window.resolution.width();
@@ -196,7 +192,7 @@ fn detect_scoring(
 
 fn reset_ball(
   mut ball: Query<(&mut Position, &mut Velocity), With<Ball>>,
-  mut events: EventReader<Scored>,
+  mut events: MessageReader<Scored>,
 ) {
   for event in events.read() {
     if let Ok((mut position, mut velocity)) = ball.single_mut() {

@@ -1,8 +1,6 @@
 use bevy::prelude::*;
 
-use bevy::math::bounding::{
-  Aabb2d, BoundingCircle, BoundingVolume, IntersectsVolume,
-};
+use bevy::math::bounding::{Aabb2d, BoundingVolume, IntersectsVolume};
 
 #[derive(Component, Default)]
 #[require(Transform)]
@@ -12,10 +10,6 @@ struct Position(pub Vec2);
 struct Collider(Rectangle);
 
 impl Collider {
-  fn width(&self) -> f32 {
-    self.0.size().x
-  }
-
   fn half_size(&self) -> Vec2 {
     self.0.half_size
   }
@@ -46,6 +40,12 @@ enum Collision {
   Top,
   Bottom,
 }
+
+#[derive(Component)]
+struct Player;
+
+#[derive(Component)]
+struct Ai;
 
 fn spawn_camera(mut commands: Commands) {
   commands.spawn(Camera2d);
@@ -87,15 +87,31 @@ fn spawn_paddles(
   mut commands: Commands,
   mut meshes: ResMut<Assets<Mesh>>,
   mut materials: ResMut<Assets<ColorMaterial>>,
+  window: Single<&Window>,
 ) {
   let mesh = meshes.add(PADDLE_SHAPE);
   let material = materials.add(PADDLE_COLOR);
+  let half_window_size = window.resolution.size() / 2.;
+  let padding = 20.;
+
+  let player_position = Vec2::new(-half_window_size.x + padding, 0.);
 
   commands.spawn((
+    Player,
     Paddle,
-    Mesh2d(mesh),
-    MeshMaterial2d(material),
-    Position(Vec2::new(250., 0.)),
+    Mesh2d(mesh.clone()),
+    MeshMaterial2d(material.clone()),
+    Position(player_position),
+  ));
+
+  let ai_position = Vec2::new(half_window_size.x - padding, 0.);
+
+  commands.spawn((
+    Ai,
+    Paddle,
+    Mesh2d(mesh.clone()),
+    MeshMaterial2d(material.clone()),
+    Position(ai_position),
   ));
 }
 
@@ -170,3 +186,4 @@ fn main() {
     )
     .run();
 }
+

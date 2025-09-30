@@ -21,7 +21,7 @@ struct Velocity(Vec2);
 #[derive(Component)]
 #[require(
   Position,
-  Velocity = Velocity(Vec2::new(1., 0.)),
+  Velocity = Velocity(Vec2::new(-BALL_SPEED, 0.)),
   Collider = Collider(Rectangle::new(BALL_SIZE, BALL_SIZE))
 )]
 struct Ball;
@@ -51,6 +51,63 @@ struct Player;
 
 #[derive(Component)]
 struct Ai;
+
+#[derive(Resource)]
+struct Score {
+  player: u32,
+  ai: u32,
+}
+
+#[derive(EntityEvent)]
+struct Scored {
+  #[event_target]
+  scorer: Entity,
+}
+
+fn detect_goal(
+  ball: Single<(&Position, &Collider), With<Ball>>,
+  player: Single<Entity, (With<Player>, Without<Ai>)>,
+  ai: Single<Entity, (With<Ai>, Without<Player>)>,
+  window: Single<&Window>,
+  mut commands: Commands,
+) {
+  let (ball_position, ball_collider) = ball.into_inner();
+  let half_window_size = window.resolution.size() / 2.;
+
+  if ball_position.0.x - ball_collider.half_size().x > half_window_size.x {
+    commands.trigger(Scored { scorer: *player });
+  }
+
+  if ball_position.0.x + ball_collider.half_size().x < -half_window_size.x {
+    commands.trigger(Scored { scorer: *ai });
+  }
+}
+
+fn reset_ball(
+  _event: On<Scored>,
+  ball: Single<(&mut Position, &mut Velocity), With<Ball>>,
+) {
+  let (mut ball_position, mut ball_velocity) = ball.into_inner();
+  ball_position.0 = Vec2::ZERO;
+  ball_velocity.0 = Vec2::new(BALL_SPEED, 0.);
+}
+
+fn update_score(
+  event: On<Scored>,
+  mut score: ResMut<Score>,
+  is_ai: Query<&Ai>,
+  is_player: Query<&Player>,
+) {
+  if is_ai.get(event.scorer).is_ok() {
+    score.ai += 1;
+    println!("AI scored! {} - {}", score.player, score.ai);
+  }
+
+  if is_player.get(event.scorer).is_ok() {
+    score.player += 1;
+    println!("Player scored! {} - {}", score.player, score.ai);
+  }
+}
 
 fn spawn_camera(mut commands: Commands) {
   commands.spawn(Camera2d);
@@ -85,7 +142,7 @@ fn spawn_ball(
   commands.spawn((Ball, Mesh2d(mesh), MeshMaterial2d(material)));
 }
 
-const PADDLE_SHAPE: Rectangle = Rectangle::new(10., 50.);
+const PADDLE_SHAPE: Rectangle = Rectangle::new(20., 50.);
 const PADDLE_COLOR: Color = Color::srgb(0., 1., 0.);
 
 fn spawn_paddles(
@@ -272,6 +329,7 @@ fn move_paddles(mut paddles: Query<(&mut Position, &Velocity), With<Paddle>>) {
 fn main() {
   App::new()
     .add_plugins(DefaultPlugins)
+    .insert_resource(Score { player: 0, ai: 0 })
     .add_systems(
       Startup,
       (spawn_ball, spawn_paddles, spawn_camera, spawn_gutters),
@@ -285,7 +343,10 @@ fn main() {
         move_paddles.before(project_positions),
         handle_player_input.before(move_paddles),
         constrain_paddle_position.after(move_paddles),
+        detect_goal.after(move_ball),
       ),
     )
+    .add_observer(reset_ball)
+    .add_observer(update_score)
     .run();
 }

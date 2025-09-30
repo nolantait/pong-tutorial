@@ -384,12 +384,12 @@ fn update_score(
 ) {
   if is_ai.get(event.scorer).is_ok() {
     score.ai += 1;
-    println!("AI scored! {} - {}", score.player, score.ai);
+    info!("AI scored! {} - {}", score.player, score.ai);
   }
 
   if is_player.get(event.scorer).is_ok() {
     score.player += 1;
-    println!("Player scored! {} - {}", score.player, score.ai);
+    info!("Player scored! {} - {}", score.player, score.ai);
   }
 }
 

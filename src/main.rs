@@ -21,7 +21,7 @@ struct Velocity(Vec2);
 #[derive(Component)]
 #[require(
   Position,
-  Velocity = Velocity(Vec2::new(-BALL_SPEED, 0.)),
+  Velocity = Velocity(Vec2::new(-BALL_SPEED, BALL_SPEED)),
   Collider = Collider(Rectangle::new(BALL_SIZE, BALL_SIZE))
 )]
 struct Ball;
@@ -64,50 +64,11 @@ struct Scored {
   scorer: Entity,
 }
 
-fn detect_goal(
-  ball: Single<(&Position, &Collider), With<Ball>>,
-  player: Single<Entity, (With<Player>, Without<Ai>)>,
-  ai: Single<Entity, (With<Ai>, Without<Player>)>,
-  window: Single<&Window>,
-  mut commands: Commands,
-) {
-  let (ball_position, ball_collider) = ball.into_inner();
-  let half_window_size = window.resolution.size() / 2.;
+#[derive(Component)]
+struct PlayerScore;
 
-  if ball_position.0.x - ball_collider.half_size().x > half_window_size.x {
-    commands.trigger(Scored { scorer: *player });
-  }
-
-  if ball_position.0.x + ball_collider.half_size().x < -half_window_size.x {
-    commands.trigger(Scored { scorer: *ai });
-  }
-}
-
-fn reset_ball(
-  _event: On<Scored>,
-  ball: Single<(&mut Position, &mut Velocity), With<Ball>>,
-) {
-  let (mut ball_position, mut ball_velocity) = ball.into_inner();
-  ball_position.0 = Vec2::ZERO;
-  ball_velocity.0 = Vec2::new(BALL_SPEED, 0.);
-}
-
-fn update_score(
-  event: On<Scored>,
-  mut score: ResMut<Score>,
-  is_ai: Query<&Ai>,
-  is_player: Query<&Player>,
-) {
-  if is_ai.get(event.scorer).is_ok() {
-    score.ai += 1;
-    println!("AI scored! {} - {}", score.player, score.ai);
-  }
-
-  if is_player.get(event.scorer).is_ok() {
-    score.player += 1;
-    println!("Player scored! {} - {}", score.player, score.ai);
-  }
-}
+#[derive(Component)]
+struct AiScore;
 
 fn spawn_camera(mut commands: Commands) {
   commands.spawn(Camera2d);
@@ -326,13 +287,134 @@ fn move_paddles(mut paddles: Query<(&mut Position, &Velocity), With<Paddle>>) {
   }
 }
 
+fn detect_goal(
+  ball: Single<(&Position, &Collider), With<Ball>>,
+  player: Single<Entity, (With<Player>, Without<Ai>)>,
+  ai: Single<Entity, (With<Ai>, Without<Player>)>,
+  window: Single<&Window>,
+  mut commands: Commands,
+) {
+  let (ball_position, ball_collider) = ball.into_inner();
+  let half_window_size = window.resolution.size() / 2.;
+
+  if ball_position.0.x - ball_collider.half_size().x > half_window_size.x {
+    commands.trigger(Scored { scorer: *player });
+  }
+
+  if ball_position.0.x + ball_collider.half_size().x < -half_window_size.x {
+    commands.trigger(Scored { scorer: *ai });
+  }
+}
+
+fn reset_ball(
+  _event: On<Scored>,
+  ball: Single<(&mut Position, &mut Velocity), With<Ball>>,
+) {
+  let (mut ball_position, mut ball_velocity) = ball.into_inner();
+  ball_position.0 = Vec2::ZERO;
+  ball_velocity.0 = Vec2::new(BALL_SPEED, 0.);
+}
+
+fn update_scoreboard(
+  mut player_score: Single<&mut Text, (With<PlayerScore>, Without<AiScore>)>,
+  mut ai_score: Single<&mut Text, (With<AiScore>, Without<PlayerScore>)>,
+  score: Res<Score>,
+) {
+  if score.is_changed() {
+    player_score.0 = score.player.to_string();
+    ai_score.0 = score.ai.to_string();
+  }
+}
+
+fn spawn_scoreboard(mut commands: Commands) {
+  let container = Node {
+    width: percent(100.0),
+    height: percent(100.0),
+    justify_content: JustifyContent::Center,
+    ..default()
+  };
+
+  let header = Node {
+    width: px(200.),
+    height: px(100.),
+    ..default()
+  };
+
+  // The players score on the left hand side
+  let player_score = (
+    PlayerScore,
+    Text::new("0"),
+    TextFont::from_font_size(72.0),
+    TextColor(Color::WHITE),
+    TextLayout::new_with_justify(Justify::Center),
+    Node {
+      position_type: PositionType::Absolute,
+      top: px(5.),
+      left: px(0.),
+      ..default()
+    },
+  );
+
+  // The AI score on the right hand side
+  let ai_score = (
+    AiScore,
+    Text::new("0"),
+    TextFont::from_font_size(72.0),
+    TextColor(Color::WHITE),
+    TextLayout::new_with_justify(Justify::Center),
+    Node {
+      position_type: PositionType::Absolute,
+      top: px(5.),
+      right: px(0.),
+      ..default()
+    },
+  );
+
+  commands.spawn((
+    container,
+    children![(header, children![player_score, ai_score])],
+  ));
+}
+
+fn update_score(
+  event: On<Scored>,
+  mut score: ResMut<Score>,
+  is_ai: Query<&Ai>,
+  is_player: Query<&Player>,
+) {
+  if is_ai.get(event.scorer).is_ok() {
+    score.ai += 1;
+    println!("AI scored! {} - {}", score.player, score.ai);
+  }
+
+  if is_player.get(event.scorer).is_ok() {
+    score.player += 1;
+    println!("Player scored! {} - {}", score.player, score.ai);
+  }
+}
+
+fn move_ai(
+  ai: Single<(&mut Velocity, &Position), With<Ai>>,
+  ball: Single<&Position, With<Ball>>,
+) {
+  let (mut velocity, position) = ai.into_inner();
+  let a_to_b = ball.0 - position.0;
+  velocity.0.y = a_to_b.y.signum() * PADDLE_SPEED;
+}
+
 fn main() {
   App::new()
     .add_plugins(DefaultPlugins)
     .insert_resource(Score { player: 0, ai: 0 })
     .add_systems(
       Startup,
-      (spawn_ball, spawn_paddles, spawn_camera, spawn_gutters),
+      (
+        spawn_ball,
+        spawn_paddles,
+        spawn_camera,
+        spawn_gutters,
+        spawn_scoreboard,
+      ),
     )
     .add_systems(
       FixedUpdate,
@@ -344,6 +426,8 @@ fn main() {
         handle_player_input.before(move_paddles),
         constrain_paddle_position.after(move_paddles),
         detect_goal.after(move_ball),
+        update_scoreboard,
+        move_ai,
       ),
     )
     .add_observer(reset_ball)

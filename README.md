@@ -5,7 +5,7 @@ of dependencies for the purpose of learning Bevy.
 
 You can read the full thing at: https://taintedcoders.com/bevy/tutorials/pong-tutorial
 
-This guide is up to date with Bevy `0.16`.
+This guide is up to date with Bevy `0.18`.
 
 ## Usage
 
@@ -26,7 +26,7 @@ cargo run
 You can create your own repo and follow along starting with the command:
 
 ```
-cargo add bevy@0.16 --no-default-features --features "bevy_core_pipeline,bevy_render,bevy_text,bevy_ui,bevy_winit,default_font,multi_threaded,x11,wayland,webgl2"
+cargo add bevy@0.18 --no-default-features --features "bevy_core_pipeline,bevy_render,bevy_text,bevy_ui,bevy_winit,default_font,multi_threaded,x11,wayland,webgl2"
 ```
 
 We only use the plugins we need for this project and remove the rest to reduce

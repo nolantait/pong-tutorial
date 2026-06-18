@@ -1,6 +1,11 @@
-use bevy::prelude::*;
-
-use bevy::math::bounding::{Aabb2d, BoundingVolume, IntersectsVolume};
+use bevy::{
+  math::bounding::{
+    Aabb2d,
+    BoundingVolume,
+    IntersectsVolume,
+  },
+  prelude::*,
+};
 
 #[derive(Component, Default)]
 #[require(Transform)]
@@ -346,7 +351,7 @@ fn spawn_scoreboard(mut commands: Commands) {
     Text::new("0"),
     TextFont::from_font_size(72.0),
     TextColor(Color::WHITE),
-    TextLayout::new_with_justify(Justify::Center),
+    TextLayout::justify(Justify::Center),
     Node {
       position_type: PositionType::Absolute,
       top: px(5.),
@@ -361,7 +366,7 @@ fn spawn_scoreboard(mut commands: Commands) {
     Text::new("0"),
     TextFont::from_font_size(72.0),
     TextColor(Color::WHITE),
-    TextLayout::new_with_justify(Justify::Center),
+    TextLayout::justify(Justify::Center),
     Node {
       position_type: PositionType::Absolute,
       top: px(5.),

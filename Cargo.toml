@@ -7,4 +7,4 @@ edition = "2024"
 
 [dependencies]
 
-bevy = { git = "https://github.com/bevyengine/bevy.git", tag = "v0.19.0-rc.3" }
+bevy = "0.20"

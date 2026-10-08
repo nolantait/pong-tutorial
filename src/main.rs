@@ -1,10 +1,10 @@
 use bevy::{
-  math::bounding::{
+  prelude::*,
+  shape::{
     Aabb2d,
     BoundingVolume,
     IntersectsVolume,
   },
-  prelude::*,
 };
 
 #[derive(Component, Default)]
